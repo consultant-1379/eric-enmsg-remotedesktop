@@ -1,0 +1,3 @@
+preStop:
+  exec:
+    command: ['/bin/sh', '-c', '/ericsson/sg/check_user_session.sh']

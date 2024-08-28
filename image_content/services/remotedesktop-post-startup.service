@@ -1,0 +1,21 @@
+[Unit]
+Description=Remote Desktop Post Startup Helper
+After=enm-cendiothinlinc-configuration
+Before=vmsagent.service
+Before=vsmserver.service
+Before=tlwebaccess.service
+
+[Service]
+PassEnvironment=SERVICE_NAME
+PassEnvironment=TLS_MOUNT_PATH
+Type=oneshot
+ExecStart=/ericsson/sg/remotedesktop_post_startup.sh
+TimeoutStartSec=220
+User=root
+Group=root
+StandardOutput=journal+console
+StandardError=journal+console
+RemainAfterExit=false
+
+[Install]
+WantedBy=multi-user.target

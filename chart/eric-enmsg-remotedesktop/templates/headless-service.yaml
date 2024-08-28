@@ -1,0 +1,9 @@
+{{- template "eric-enm-common-helmchart-library.service" (list . "eric-enmsg-remotedesktop.service") -}}
+  {{- define "eric-enmsg-remotedesktop.service" -}}
+metadata:
+  name: remotedesktop
+  labels:
+    service: {{ .Values.service.name }}
+spec:
+  clusterIP: None
+  {{- end -}}

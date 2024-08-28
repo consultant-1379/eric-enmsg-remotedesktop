@@ -1,0 +1,17 @@
+{{- if .Values.ingress_remote_desktop_context.enabled -}}
+{{- template "eric-enm-common-helmchart-library.ingress" (list . "eric-enmsg.ingress_remote_desktop_context") -}}
+{{- end }}
+{{- define "eric-enmsg.ingress_remote_desktop_context" -}}
+metadata:
+  name: {{ .Values.ingress_remote_desktop_context.name }}
+  annotations:
+{{- with .Values.ingress_remote_desktop_context.annotations }}
+{{ toYaml . | indent 4 }}
+{{- end }}
+spec:
+  rules:
+  - host: {{ template "eric-enm-common-helmchart-library.enmHost" . }}
+    http:
+      paths:
+{{ tpl (.Files.Get "appconfig/ingress_remote_desktop_context.yaml") . | indent 6 }}
+{{- end -}}

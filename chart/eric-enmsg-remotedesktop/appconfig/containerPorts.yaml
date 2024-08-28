@@ -1,0 +1,7 @@
+- containerPort: 22
+- containerPort: 111
+- containerPort: 443
+- containerPort: 9000
+- containerPort: 9600
+- containerPort: 9990
+- containerPort: 9999

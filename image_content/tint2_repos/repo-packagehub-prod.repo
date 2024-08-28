@@ -1,0 +1,6 @@
+[repo-packagehub-product]
+enabled=1
+autorefresh=1
+baseurl=https://arm.sero.gic.ericsson.se/artifactory/proj-suse-repos-rpm-local/PackageHub/SLE-15-SP4_x86_64/product/
+priority=90
+gpgcheck=0

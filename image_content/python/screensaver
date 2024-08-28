@@ -1,0 +1,285 @@
+#!/usr/bin/python3
+
+import tkinter as tk
+import threading
+import time
+import ctypes
+import os
+import sys
+import logging.handlers
+import getpass
+from configobj import ConfigObj
+import requests
+
+is_count_down = False
+allow_idle_time = 30
+count_down_time = 30
+
+
+# class from XScreenSaver, representing struct
+# required to obtain idle time
+class XScreenSaverInfo(ctypes.Structure):
+    """ typedef struct { ... } XScreenSaverInfo; """
+    _fields_ = [('window', ctypes.c_ulong),  # screen saver window
+                ('state', ctypes.c_int),  # off,on,disabled
+                ('kind', ctypes.c_int),  # blanked,internal,external
+                ('til_or_since', ctypes.c_ulong),  # milliseconds
+                ('idle', ctypes.c_ulong),  # milliseconds
+                ('event_mask', ctypes.c_ulong)]  # events
+
+
+def get_display_root_xss():
+    xlib = ctypes.cdll.LoadLibrary('libX11.so.6')
+    xlib.XOpenDisplay.argtypes = [ctypes.c_char_p]
+    xlib.XOpenDisplay.restype = ctypes.c_void_p  # Actually, it's a Display pointer, but since
+    # the Display structure definition is not known (nor do we care about it), make it a void pointer
+
+    xlib.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+    xlib.XDefaultRootWindow.restype = ctypes.c_uint32
+
+    display = xlib.XOpenDisplay(os.environ['DISPLAY'].encode('ascii'))
+    root = xlib.XDefaultRootWindow(display)
+
+    xss = ctypes.cdll.LoadLibrary('libXss.so.1')
+    xss.XScreenSaverQueryInfo.argtypes = [ctypes.c_void_p, ctypes.c_uint32, ctypes.POINTER(XScreenSaverInfo)]
+    xss.XScreenSaverQueryInfo.restype = ctypes.c_int
+    return display, root, xss
+
+
+# configure logger
+SCREENSAVER = "%(levelname)-4s: SCREENSAVER For " + getpass.getuser() + ":"
+logger = logging.getLogger('basicLogger')
+logger.setLevel(logging.INFO)
+handler = logging.handlers.SysLogHandler('/dev/log')
+formatter = logging.Formatter(SCREENSAVER + ' %(message)s')
+handler.formatter = formatter
+logger.addHandler(handler)
+
+
+# sets the countdown text
+def set_count_down_text(seconds_remaining, label_text):
+    minutes, seconds = divmod(seconds_remaining, 60)
+    label_text.set("Your session will time out in " + str(minutes) + " minutes and " + str(
+        seconds) + " seconds due to inactivity.\n\n Click on the screen to continue.")
+
+
+# makes the main window full screen
+def set_main_window_full_screen(root):
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    root.geometry(f'{screen_width}x{screen_height}')
+
+
+# invalidates session in session management
+def invalidate_session():
+    try:
+        ssoTokenPath = os.environ["HOME"] + "/" + ".desktop_login"
+        file = open(ssoTokenPath, "r")
+        ssoCookie = file.read()
+        file.close()
+
+        cookies = {
+            'iPlanetDirectoryPro': ssoCookie,
+        }
+
+        url = 'http://{0}:8080/element-manager-services/desktop/session/{1}?isKilled=true'.format(
+            os.environ['HOSTNAME'], getpass.getuser())
+        response = requests.delete(url, cookies=cookies, timeout=10)
+
+        response.close()
+
+    except IOError:
+        logger.error("Unable to read invalidate session.")
+
+
+# if countdown has started, performs update to UI
+# when reaching the countdown to 0, it terminates all processes related to user's session
+# if countdown is disabled, it periodically checks, if user is idle for certain time,
+# if yes, then starts countdown
+def create_count_down(bkg, label_text):
+    global is_count_down
+    global count_down_time
+
+    logger.debug('is_count_down true')
+    for i in range(count_down_time, 0, -1):
+        # check, if is_count_down variable has changed,
+        # as user clicked or pressed any key on the keyboard
+        if is_count_down:
+            set_main_window_full_screen(bkg.root)
+            set_count_down_text(i, label_text)
+            logger.info("time: " + str(i))
+            time.sleep(1)
+        else:
+            return
+    logger.info('Countdown reached, logging off.')
+    invalidate_session()
+    os.system("pkill -15 -U $USER")
+
+
+def is_user_idle():
+    global is_count_down
+
+    while not is_count_down:
+        logger.debug('is_count_down false')
+        idle_time = get_idle_time()
+        if idle_time > allow_idle_time:
+            logger.debug('User is idle for too long')
+            is_count_down = True
+            return True
+        time.sleep(5)
+    return False
+
+
+# gets idle time using XScreenSaver library
+def get_idle_time():
+    display, root, xss = get_display_root_xss()
+    xss.XScreenSaverAllocInfo.restype = ctypes.POINTER(XScreenSaverInfo)
+    xssinfo = xss.XScreenSaverAllocInfo()
+    xss.XScreenSaverQueryInfo(display, root, xssinfo)
+    idle_time = xssinfo.contents.idle
+    logger.debug('User is idle for: %s ms' % idle_time)
+    xss.XFree(xssinfo)
+    return idle_time
+
+
+# callback for click event
+# if countdown is started and user clicks on the main window,
+# countdown is stopped
+def callback(event):
+    logger.debug('User clicked, cancelling countdown')
+    global is_count_down
+    is_count_down = False
+
+
+def str2bool(v):
+    str_value = v[0].split(";")[0]
+    value = str_value.strip()
+    return value.lower() in ("yes", "true", "t", "1", "on")
+
+
+def str2int(v):
+    str_value = v[0].split(";")[0]
+    value = int(str_value.strip())
+    return value
+
+
+def screensaver(bkg, label_text):
+    global is_count_down
+
+    while True:
+        if is_count_down:
+            set_main_window_full_screen(bkg.root)
+            # show screensaver window
+            bkg.root.deiconify()
+            create_count_down(bkg, label_text)
+        else:
+            # hide screensaver window
+            bkg.root.withdraw()
+            is_user_idle()
+
+
+# screensaver main window and frame for widgets
+class Background:
+    def __init__(self):
+        # Top level window
+        self.root = tk.Tk()
+        set_main_window_full_screen(self.root)
+        # remove the whole toolbar
+        self.root.overrideredirect(True)
+        # keep screensaver above all other windows
+        self.root.attributes('-topmost', True)
+        # make screensaver default window full screen
+        self.root.attributes('-fullscreen', True)
+        self.main_frame = self.create_widgets()
+
+    def create_widgets(self):
+        main_frame = tk.Frame(self.root)
+        main_frame.pack(expand=1, fill=tk.BOTH)
+        return main_frame
+
+
+# function for disabling close button
+def disable_close():
+    pass
+
+
+# main method,
+# adds events handlers to main window
+# adds label to main window to display countdown text
+# hides main window
+# starts the background thread, to check user's idle time
+def app_main():
+
+    global allow_idle_time
+    global count_down_time
+
+    # Main frame for background
+    bkg = Background()
+    window = bkg.main_frame
+
+    # define the tkinter label text variable
+    text_variable = tk.StringVar()
+
+    # label for progress bar
+    label = tk.Label(window, textvariable=text_variable)
+    label.grid(column=0, row=0)
+    window.columnconfigure(0, weight=1)
+    window.rowconfigure(0, weight=1)
+
+    try:
+        config_obj = ConfigObj('/home/shared/common/rdesktop/screensaver.ini')
+        config = config_obj["DEFAULT"]
+
+        isEnabled = str2bool(config['Enabled'])
+
+        logger.info("isEnabled: " + str(isEnabled))
+
+        if not isEnabled:
+            sys.exit(0)
+
+        count_down_time = str2int(config['CountdownTime'])  # countdown time in seconds
+        allow_idle_time = str2int(config['IdleTime']) * 1000  # idle time in milliseconds
+
+    except IOError:
+        logger.error("Unable to read configuration file, setting default values.")
+        count_down_time = 30
+        allow_idle_time = 60 * 1000
+
+    logger.info("Starting with configured timeout " + str(allow_idle_time) + " miliseconds.")
+
+    # handle mouse clicks
+    bkg.root.bind("<Button-1>", callback)
+
+    # disable the window close button
+    bkg.root.protocol("WM_DELETE_WINDOW", disable_close)
+
+    title = " " + getpass.getuser()
+    bkg.root.title(title)
+    bkg.root.withdraw()
+
+    thread = threading.Thread(target=screensaver, args=(bkg, text_variable))
+    thread.daemon = True
+    thread.start()
+
+    bkg.root.mainloop()
+
+
+if __name__ == "__main__":
+    while True:
+        try:
+            # get the current login user.
+            current_login_user = getpass.getuser()
+            # Note: should not register/create a user with root as a username in remotedesktop.
+            if current_login_user != "root" and not os.path.exists("/home/shared/root"):
+                logger.info("logged in " + current_login_user)
+                user_home = os.path.join("/home/shared", current_login_user)
+                display_path = os.path.join(user_home, ".openbox_display")
+                if os.path.exists(display_path):
+                    os.system("export DISPLAY=$(cat {})".format(display_path))
+                    _display = os.environ['DISPLAY']
+                    if _display:
+                        app_main()
+                        break
+        except KeyError:
+            pass
+        time.sleep(5)

@@ -1,0 +1,279 @@
+## eric-enmsg-remotedesktop image version
+
+global:
+  registry:
+    url: armdocker.rnd.ericsson.se
+    pullSecret:
+  ingress:
+    enmHost:
+  ericIngress:
+    enabled: false
+  timezone:
+  enmProperties:
+    COM_INF_LDAP_ROOT_SUFFIX:
+    COM_INF_LDAP_ADMIN_ACCESS:
+    COM_INF_LDAP_ADMIN_CN:
+    COM_INF_LDAP_PORT:
+    dps_persistence_provider: neo4j
+    LDAP_ADMIN_PASSWORD:
+    LDAP_ADMIN_CN:
+    postgresql01_admin_password:
+    postgres_service: postgres
+  replicas-eric-enmsg-remotedesktop: 2
+productInfo:
+  # R-State of the product. R State should match helm chart version (3.1.0 -> R2A)
+  # To automate it when packaging the helm chart rstate can be generated
+  # and below value replaced with correct R-State
+  number: CXC 174 2029
+  rstate: RSTATE
+# Number of replicas(pods) to deploy
+securityPolicy:
+  rolename: remotedesktop
+replicas-eric-enmsg-remotedesktop: 1
+images:
+  eric-enmsg-remotedesktop:
+    name: eric-enmsg-remotedesktop
+    tag: VERSION
+  waitInitContainer:
+    enabled: true
+    name: eric-enm-init-container
+    tag: 1.64.0-32
+    command: "[ '/bin/sh', '-c', 'bash /var/tmp/check_service.sh -s jms01,sps' ]"
+  eric-enm-monitoring:
+    enabled: true
+    name: eric-enm-monitoring-eap7
+    tag: 1.64.0-33
+  waitForCertificatesContainer:
+    enabled: true
+    name: enm-wait-for-certificates-container
+    tag: 1.52.0-33
+    command:
+imageCredentials:
+  repoPath: proj-enm
+  pullPolicy: Always
+  registry:
+    url:
+    pullSecret:
+## Configure the service
+service:
+  name: remotedesktop
+  sgname: remotedesktop
+  annotations: {}
+  labels:
+  xmlMountPath: "/ericsson/credm/certReqMount"
+  tlsMountPath: "/ericsson/credm/tlsMount"
+ingress:
+  enabled: true
+persistentVolumeClaim:
+  enabled: false
+ingress_remote_desktop_context:
+  name: remotedesktop-http
+  enabled: true
+  annotations:
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+    nginx.ingress.kubernetes.io/backend-protocol: HTTPS
+    nginx.ingress.kubernetes.io/keep-alive-requests: "1000000"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-stream-timeout: "3600"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-hash: sha1
+    nginx.ingress.kubernetes.io/session-cookie-path: /
+    nginx.ingress.kubernetes.io/session-cookie-name: enm-remotedesktop
+    nginx.ingress.kubernetes.io/upstream-keepalive-requests: "1000000"
+    nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "72000"
+    nginx.org/websocket-services: remotedesktop
+## Configure resource requests and limits
+resources:
+  requests:
+    enabled: true
+    memory: 1024Mi
+    cpu: 600m
+  limits:
+    enabled: true
+    memory: 2048Mi
+    cpu: 2000m
+  monitoring:
+    enabled: true
+    requests:
+      memory: 200Mi
+      cpu: 50m
+    limits:
+      cpu: 200m
+      memory: 300Mi
+probes:
+  container:
+    startupProbe:
+      enabled: true
+      command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+      arguments: --exec_agents
+      initialDelaySeconds: 10
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 20
+    livenessProbe:
+      enabled: true
+      command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+      arguments: --exec_agents
+      initialDelaySeconds: 30
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 2
+    readinessProbe:
+      enabled: true
+      command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+      arguments: --exec_agents
+      initialDelaySeconds: 10
+      periodSeconds: 30
+      timeoutSeconds: 30
+      failureThreshold: 2
+  monitoringcontainer:
+    startupProbe:
+      enabled: true
+      command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+      arguments: --exec_agents
+      initialDelaySeconds: 10
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 20
+    livenessProbe:
+      enabled: true
+      command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+      arguments: --exec_agents
+      initialDelaySeconds: 30
+      timeoutSeconds: 30
+      periodSeconds: 30
+      failureThreshold: 2
+startupProbe:
+  enabled: true
+  command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+  arguments: --exec_agents
+  initialDelaySeconds: 10
+  timeoutSeconds: 30
+  periodSeconds: 30
+  failureThreshold: 20
+# LivenessProbe Health Check configuration.
+livenessProbe:
+  enabled: true
+  command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+  arguments: --exec_agents
+  initialDelaySeconds: 30
+  timeoutSeconds: 30
+  periodSeconds: 30
+  failureThreshold: 2
+readinessProbe:
+  enabled: true
+  command: /ericsson/enm_healthcheck/bin/enm_healthcheck.py
+  arguments: --exec_agents
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 30
+  failureThreshold: 2
+# Termiation grace wait before force terminate pod
+terminationGracePeriod:
+  enabled: true
+  seconds: 60
+# Extra Annotations to be added to pod
+podAnnotations: {}
+## Tolerations for pod assignment
+tolerations: []
+## Affinity for pod assignment
+affinity: requiredDuringSchedulingIgnoredDuringExecution
+# Constrain which nodes your pod is eligible to be scheduled on
+nodeAffinity: {}
+priorityClassName: ""
+## Node selector
+nodeSelector: {}
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    partition: 0
+## Pod Disruption Budget is an indicator of the number of disruptions that can be tolerated at a given time.
+podDisruptionBudget:
+  maxUnavailable: 1
+## Pod Management Policy
+podManagementPolicy:
+  enabled: true
+  type: Parallel
+## Credm
+credmController:
+  name: eric-enm-credm-controller
+  port: 5001
+jobs:
+  jobAction: certrequest
+  certRequest:
+    imageName: enm-certrequestjob-container
+    pullPolicy: Always
+    tag: 1.52.0-33
+    resources:
+      requests:
+        enabled: true
+        cpu: 500m
+        memory: 512Mi
+      limits:
+        enabled: true
+        cpu: 1000m
+        memory: 512Mi
+securityContext:
+  remotedesktop:
+    allowPrivilegeEscalation: true
+    privileged: true
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    capabilities:
+      drop:
+      - all
+      add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - SYS_RESOURCE
+      - SYS_PTRACE
+      - SETGID
+      - SETUID
+      - AUDIT_READ
+      - AUDIT_WRITE
+      - NET_BIND_SERVICE
+      - SYS_PACCT
+      - CHOWN
+      - DAC_OVERRIDE
+      - MAC_OVERRIDE
+      - FOWNER
+      - FSETID
+      - DAC_READ_SEARCH
+      - SYSLOG
+      - SYS_NICE
+      - SYS_TTY_CONFIG
+      - LINUX_IMMUTABLE
+  monitoring:
+    allowPrivilegeEscalation: true
+    privileged: true
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    capabilities:
+      drop:
+      - all
+      add:
+      - DAC_READ_SEARCH
+      - DAC_OVERRIDE
+      - FOWNER
+      - SYS_ADMIN
+      - SYS_RESOURCE
+  waitInitContainer:
+    allowPrivilegeEscalation: true
+    privileged: true
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    capabilities:
+      drop:
+      - all
+  waitForCertificatesContainer:
+    allowPrivilegeEscalation: true
+    privileged: true
+    readOnlyRootFilesystem: false
+    runAsNonRoot: false
+    capabilities:
+      drop:
+      - all

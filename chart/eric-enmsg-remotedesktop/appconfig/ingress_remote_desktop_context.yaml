@@ -1,0 +1,77 @@
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /app/
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /legacy
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /vendor
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /core
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /main
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /main/agent
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /js/
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /include
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /images
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /styles
+  pathType: ImplementationSpecific
+- backend:
+    service:
+      name: remotedesktop
+      port:
+        number: 443
+  path: /websocket
+  pathType: ImplementationSpecific

@@ -1,0 +1,9 @@
+- name: sshd
+  port: 22
+  targetPort: 22
+- name: https
+  port: 443
+  targetPort: 443
+- name: metrics
+  port: 9600
+  targetPort: 9600

@@ -1,0 +1,7 @@
+DEP=true
+NAME=eric-enm-remote-desktop
+SVC=remotedesktop
+WAIT=true
+WAIT_LIST=jms01,sps
+REQUESTS=false
+REQUESTS_LIST=6Gi,2000m
